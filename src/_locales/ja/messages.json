@@ -1,27 +1,74 @@
 {
-  "appName": { "message": "Drive HTML Preview" },
-  "appDescription": { "message": "Google ドライブの HTML ファイルを、ソースではなく実際の Web ページとして表示します。" },
-  "actionTitle": { "message": "この Drive の HTML をプレビュー" },
-  "contextMenuTitle": { "message": "Drive の HTML を Web ページとしてプレビュー" },
-  "previewButton": { "message": "Web ページとして表示" },
-  "previewButtonTitle": { "message": "この HTML ファイルを新しいタブで表示します" },
-  "modeRendered": { "message": "プレビュー" },
-  "modeSource": { "message": "ソース" },
-  "reload": { "message": "Drive から再読み込み" },
-  "openInDrive": { "message": "Google ドライブで開く" },
-  "loading": { "message": "Google ドライブから読み込み中…" },
-  "emptyTitle": { "message": "Google ドライブの HTML をプレビュー" },
-  "emptyBody": { "message": "Google ドライブで .html ファイルを開いて「Web ページとして表示」を押すか、下に Drive のファイルリンクを貼り付けてください。" },
-  "urlPlaceholder": { "message": "https://drive.google.com/file/d/…" },
-  "urlSubmit": { "message": "表示" },
-  "urlInvalid": { "message": "Google ドライブのファイルリンクではないようです。" },
-  "errorTitle": { "message": "ファイルを読み込めませんでした" },
-  "retry": { "message": "もう一度試す" },
-  "error_no_access": { "message": "Google ドライブからこのファイルをダウンロードできませんでした。ファイルを開ける Google アカウントでログインしているか、オーナーがダウンロードを禁止していないかを確認してください。" },
-  "error_signed_out": { "message": "Google からログアウトしています。このブラウザで Google ドライブにログインしてから、もう一度お試しください。" },
-  "error_not_found": { "message": "このファイルは存在しないか、削除されています。" },
-  "error_rate_limited": { "message": "Google ドライブがこのファイルのダウンロードを一時的に制限しています。少し待ってからお試しください。" },
-  "error_too_large": { "message": "50 MB を超えるファイルはプレビューできません。" },
-  "error_network": { "message": "Google ドライブに接続できませんでした。ネットワークを確認してお試しください。" },
-  "error_http_error": { "message": "Google ドライブから想定外の応答がありました。少し時間をおいてお試しください。" }
+  "appName": {
+    "message": "Drive HTML Preview"
+  },
+  "appDescription": {
+    "message": "Google ドライブの HTML ファイルを、ソースではなく実際の Web ページとして表示します。"
+  },
+  "actionTitle": {
+    "message": "この Drive の HTML をプレビュー"
+  },
+  "modeRendered": {
+    "message": "プレビュー"
+  },
+  "modeSource": {
+    "message": "ソース"
+  },
+  "reload": {
+    "message": "Drive から再読み込み"
+  },
+  "openInDrive": {
+    "message": "Google ドライブで開く"
+  },
+  "loading": {
+    "message": "Google ドライブから読み込み中…"
+  },
+  "emptyTitle": {
+    "message": "Google ドライブの HTML をプレビュー"
+  },
+  "emptyBody": {
+    "message": "Google ドライブで .html ファイルをプレビューすると、その場で Web ページとして表示されます。下に Drive のファイルリンクを貼り付けて開くこともできます。"
+  },
+  "urlPlaceholder": {
+    "message": "https://drive.google.com/file/d/…"
+  },
+  "urlSubmit": {
+    "message": "表示"
+  },
+  "urlInvalid": {
+    "message": "Google ドライブのファイルリンクではないようです。"
+  },
+  "errorTitle": {
+    "message": "ファイルを読み込めませんでした"
+  },
+  "retry": {
+    "message": "もう一度試す"
+  },
+  "error_no_access": {
+    "message": "Google ドライブからこのファイルをダウンロードできませんでした。ファイルを開ける Google アカウントでログインしているか、オーナーがダウンロードを禁止していないかを確認してください。"
+  },
+  "error_signed_out": {
+    "message": "Google からログアウトしています。このブラウザで Google ドライブにログインしてから、もう一度お試しください。"
+  },
+  "error_not_found": {
+    "message": "このファイルは存在しないか、削除されています。"
+  },
+  "error_rate_limited": {
+    "message": "Google ドライブがこのファイルのダウンロードを一時的に制限しています。少し待ってからお試しください。"
+  },
+  "error_too_large": {
+    "message": "50 MB を超えるファイルはプレビューできません。"
+  },
+  "error_network": {
+    "message": "Google ドライブに接続できませんでした。ネットワークを確認してお試しください。"
+  },
+  "error_http_error": {
+    "message": "Google ドライブから想定外の応答がありました。少し時間をおいてお試しください。"
+  },
+  "openInTab": {
+    "message": "新しいタブで開く"
+  },
+  "fromDrive": {
+    "message": "Drive の表示"
+  }
 }

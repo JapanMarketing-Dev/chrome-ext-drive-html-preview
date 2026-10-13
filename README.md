@@ -4,8 +4,8 @@
 
 # Drive HTML Preview
 
-**Open HTML files stored in Google Drive as real web pages, not raw source.**<br>
-One button on Drive, a new tab with the rendered page. Scripts run, encodings are detected, nothing leaves your browser.
+**See HTML files in Google Drive's own preview as real web pages, not raw source.**<br>
+Double-click an `.html` file in Drive and the rendered page appears right there. Scripts run, encodings are detected, nothing leaves your browser.
 
 [![Chrome Web Store](https://img.shields.io/badge/Chrome%20Web%20Store-Drive%20HTML%20Preview-e34f26?style=flat&logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/search/Drive%20HTML%20Preview)
 [![Release](https://img.shields.io/github/v/release/JapanMarketing-Dev/chrome-ext-drive-html-preview?style=flat&color=f06529&label=release)](https://github.com/JapanMarketing-Dev/chrome-ext-drive-html-preview/releases)
@@ -27,21 +27,19 @@ One button on Drive, a new tab with the rendered page. Scripts run, encodings ar
 
 ## Drive shows your HTML as text. This shows it as a page.
 
-Open an `.html` file in Google Drive and you get a wall of tags. Reports exported from tools, prototypes, newsletters, AI-generated pages: all of them are unreadable until you download and open them locally.
+Preview an `.html` file in Google Drive and you get a wall of tags. Reports exported from tools, prototypes, newsletters, AI-generated pages: until now you had to download each one and open it on your desktop to see it. (Slack previews HTML; Drive doesn't.)
 
-With Drive HTML Preview installed, a **Preview as web page** button appears whenever an HTML file is open in Drive. Click it and the page opens, fully rendered, in the next tab.
+With Drive HTML Preview installed, Drive's preview simply shows the page. Nothing to click.
 
-<img src="docs/images/store/en/1-before-after.png" width="100%" alt="Before: Drive shows HTML source. After: the same file rendered as a web page.">
+<img src="docs/images/store/en/1-before-after.png" width="100%" alt="Before: Drive's preview shows HTML source. After: the same preview shows the rendered page.">
 
-## One button, right where you open the file
+## Just double-click. No downloads.
 
-The button shows up on Drive's preview overlay (when you double-click a file in a folder) and on file pages (`drive.google.com/file/d/…`). You can also:
+It works wherever Drive previews a file: the overlay you get by double-clicking a file in a folder, search results, shared drives, and file pages (`drive.google.com/file/d/…`). Use Drive's own arrows to move to the next file and the preview follows.
 
-- click the extension's **toolbar icon** while a Drive HTML file is open,
-- **right-click any Drive file link** (in Gmail, Slack, docs…) and choose *Preview Drive HTML as a web page*, or
-- open the toolbar icon anywhere and **paste a Drive link**.
+A small switch at the top right flips between the page and its source, or opens the page in a full tab. The toolbar icon also opens the current file in a full tab, or lets you paste any Drive link.
 
-<img src="docs/images/store/en/2-button.png" width="100%" alt="A Preview as web page button at the bottom right of a file showing HTML source.">
+<img src="docs/images/store/en/2-in-place.png" width="100%" alt="Drive's preview showing an HTML report rendered in place.">
 
 ## Page or code, one click apart
 
@@ -56,7 +54,7 @@ Switch between the rendered page and its source. Character encodings are picked 
 | | |
 |---|---|
 | **Sandboxed.** The HTML runs in an isolated, opaque-origin sandbox. It can't touch the extension, your Drive session or your other tabs. | **No servers.** Your browser downloads the file straight from Drive with your own sign-in. No analytics, no ads, no account linking. |
-| **Minimal permissions.** Access to `drive.google.com` / `drive.usercontent.google.com` and one right-click menu item. | **Works with what you can already open.** Shared drives, shared files, multiple signed-in accounts (`/u/1/`), resource-key links. |
+| **Minimal permissions.** Access to `drive.google.com` / `drive.usercontent.google.com`. Nothing else. | **Works with what you can already open.** Shared drives, shared files, multiple signed-in accounts (`/u/1/`), resource-key links. |
 
 ## Install
 
@@ -71,22 +69,22 @@ Switch between the rendered page and its source. Character encodings are picked 
 ## How it works
 
 ```
-Drive page ──(file ID + name)──▶ content script ──▶ service worker ──▶ viewer tab
-                                                                         │
-                         drive.google.com/uc?export=download&id=…  ◀─────┘  fetch with your session
-                                                                         │
-                                         sandboxed iframe ◀── decoded HTML ┘
+Drive preview ──(file ID + name)──▶ content script ──▶ frame over Drive's text page
+                                                          │  viewer.html?embed=1
+          drive.google.com/uc?export=download&id=…  ◀─────┤  fetch with your session
+          (falls back to the text Drive already shows)    │
+                              sandboxed iframe ◀── decoded HTML
 ```
 
-- `src/content.js` finds the HTML file on screen: from the URL on file pages, or by matching the overlay's file name to the list item you opened.
-- `src/viewer.js` downloads the file, detects its encoding (`src/lib/html.js`) and hands the text to `src/sandbox.html`, a manifest sandbox page with an opaque origin.
+- `src/content.js` finds the HTML file on screen (from the URL on file pages, or by matching the overlay's file name to the list item you opened), finds Drive's text pages and lays a frame over them.
+- `src/viewer.js` downloads the file, detects its encoding (`src/lib/html.js`) and hands the text to `src/sandbox.html`, a manifest sandbox page with an opaque origin. If the download is refused, it uses the text Drive is already showing.
 - Links to other sites open in a new tab. Relative links and images that point at sibling files in Drive can't be resolved, because each Drive file has its own ID.
 
 ### Limitations
 
 - Relative paths (`./style.css`, `images/a.png`) to other Drive files don't load. Inline them, or use absolute URLs.
 - Files over 50 MB aren't previewed.
-- If the owner turned off downloading for viewers, Drive won't hand the file to the extension either.
+- If the owner turned off downloading for viewers, the extension renders the text Drive shows instead, which Drive may cut short for very long files.
 
 ## Development
 

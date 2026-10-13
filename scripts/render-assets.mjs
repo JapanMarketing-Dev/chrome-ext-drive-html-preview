@@ -10,6 +10,13 @@ import { chromium } from 'playwright';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const what = process.argv[2] || 'all';
 
+// The rendered page as it sits over Drive's preview, without the stand-in Drive header.
+async function cropped(path) {
+  const { execFileSync } = await import('node:child_process');
+  const png = execFileSync('magick', [join(root, path), '-crop', '1136x672+72+128', '+repage', 'png:-']);
+  return 'data:image/png;base64,' + png.toString('base64');
+}
+
 const dataUrl = async (path, type) => `data:${type};base64,` + (await readFile(join(root, path))).toString('base64');
 
 async function shoot(page, html, width, height, out, transparent = true) {
@@ -36,37 +43,35 @@ async function icons(page) {
 
 const COPY = {
   ja: {
-    s1: ['Drive の HTML を、<br>ソースではなくページで。', 'Google ドライブで開くと文字だらけの HTML ファイルを、ワンクリックで本来の Web ページとして表示します。'],
-    s2: ['HTML を開くと、<br>ボタンがひとつ<br>増えるだけ。', 'Drive のプレビューやファイル画面に「Web ページとして表示」ボタンが出ます。押すと隣のタブに表示。'],
+    s1: ['Drive の HTML を、<br>ソースではなくページで。', 'Google ドライブのプレビューで文字だらけになる HTML ファイルが、その場で本来の Web ページとして表示されます。'],
+    s2: ['ダブルクリック<br>するだけ。<br>ダウンロード不要。', 'いつもどおり Drive でファイルを開くだけ。デスクトップに保存して開き直す手間がなくなります。'],
     s3: ['見た目もコードも、<br>すぐ切り替え。', 'プレビューとソースをワンクリックで切り替え。Shift_JIS などの文字コードも自動で判別します。'],
     s4: ['ファイルはどこにも<br>送りません。', 'あなたのブラウザが Drive から直接読み込み、サンドボックス内で表示します。外部サーバーもアカウント連携もありません。'],
     before: 'いまの Drive',
-    after: 'Drive HTML Preview',
-    button: 'Web ページとして表示',
+    after: '拡張機能を入れた Drive',
     tagline: 'Google ドライブの HTML を、そのまま Web ページに。',
     short: 'Drive の HTML を、そのまま Web ページに。',
-    points: ['ワンクリックで表示', 'スクリプトも動く', '文字コード自動判別', 'データ送信なし'],
+    points: ['プレビューでそのまま表示', 'スクリプトも動く', '文字コード自動判別', 'データ送信なし'],
     privacy: [
       ['サンドボックス表示', 'HTML は拡張機能から隔離された領域で動き、Drive やほかのタブには触れません。'],
       ['外部送信ゼロ', '解析・広告・独自サーバーはありません。読み込みは Drive との直接通信だけ。'],
-      ['最小限の権限', '必要なのは Drive へのアクセスと右クリックメニューだけです。'],
+      ['最小限の権限', '必要なのは Google ドライブへのアクセスだけです。'],
     ],
   },
   en: {
-    s1: ['Drive HTML files,<br>as pages, not source.', 'Google Drive shows HTML files as raw code. Open them as the real web page in one click.'],
-    s2: ['One button, right where<br>you open the file.', 'A “Preview as web page” button appears on Drive’s preview and file pages. Click it and the page opens in the next tab.'],
+    s1: ['Drive HTML files,<br>as pages, not source.', 'Google Drive previews HTML files as raw code. With this extension the same preview shows the real web page, in place.'],
+    s2: ['Just double-click.<br>No downloads.', 'Open the file in Drive like you always do. No more saving it to your desktop to see what it looks like.'],
     s3: ['Flip between<br>page and code.', 'Switch between the rendered page and its source. Encodings such as Shift_JIS are detected automatically.'],
     s4: ['Your files stay<br>with you.', 'Your browser loads the file straight from Drive and renders it in a sandbox. No servers, no sign-in, no tracking.'],
     before: 'Google Drive today',
-    after: 'Drive HTML Preview',
-    button: 'Preview as web page',
+    after: 'Drive with the extension',
     tagline: 'Open Google Drive HTML files as real web pages.',
     short: 'Drive HTML files as real web pages.',
-    points: ['One click', 'Scripts run', 'Any encoding', 'No data sent'],
+    points: ['Right in the preview', 'Scripts run', 'Any encoding', 'No data sent'],
     privacy: [
       ['Sandboxed', 'The page runs isolated from the extension, from Drive and from your other tabs.'],
       ['Nothing sent anywhere', 'No analytics, no ads, no servers of ours. Just your browser talking to Drive.'],
-      ['Minimal permissions', 'Access to Drive and a right-click menu item. That’s it.'],
+      ['Minimal permissions', 'Access to Google Drive. That’s it.'],
     ],
   },
 };
@@ -116,6 +121,17 @@ function pill(text, scale = 1) {
     <svg viewBox="0 0 24 24" width="${20 * scale}" height="${20 * scale}"><path fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M8 7l-5 5 5 5M16 7l5 5-5 5"/><path fill="#fff" d="M10.5 9.2v5.6c0 .5.5.8.9.5l4.3-2.8c.4-.2.4-.8 0-1l-4.3-2.8c-.4-.3-.9 0-.9.5z"/></svg>${text}</div>`;
 }
 
+// The same neutral viewer, now showing the rendered page laid over it.
+// Height follows the screenshot's aspect ratio (1136×672 crop).
+function driveFrame(name, img, { width }) {
+  return `<div style="width:${width}px;border-radius:16px;overflow:hidden;background:#2b2b2e;box-shadow:0 30px 80px rgba(0,0,0,.5);font-family:${FONT}">
+    <div style="height:48px;display:flex;align-items:center;gap:12px;padding:0 18px;color:#e8e8ea;font-size:15px;font-weight:600;border-bottom:1px solid #3a3a3e">
+      <span style="width:18px;height:22px;border-radius:3px;background:#5b8def;display:inline-block"></span>${name}
+    </div>
+    <img src="${img}" style="display:block;width:100%;height:auto">
+  </div>`;
+}
+
 function browserFrame(img, { width, height }) {
   return `<div style="width:${width}px;border-radius:14px;overflow:hidden;background:#fff;box-shadow:0 30px 80px rgba(0,0,0,.55)">
     <div style="height:30px;background:#ececee;display:flex;align-items:center;gap:7px;padding:0 12px">
@@ -143,6 +159,7 @@ async function store(page) {
     const shot = (n) => dataUrl(`docs/images/shots/${lang}/${n}.png`, 'image/png');
     const rendered = await shot('viewer-rendered');
     const source = await shot('viewer-source');
+    const embedded = await cropped(`docs/images/shots/${lang}/drive-embedded.png`);
     const out = (n) => join(root, 'docs/images/store', lang, `${n}.png`);
 
     // 1. Before → after.
@@ -157,20 +174,18 @@ async function store(page) {
         <svg style="position:absolute;left:486px;top:480px" width="60" height="60" viewBox="0 0 24 24"><path d="M5 12h13M13 6l6 6-6 6" fill="none" stroke="#f06529" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <div style="position:absolute;left:566px;top:300px">
           <div style="color:#ffb79c;font:700 14px ${FONT};letter-spacing:.08em;margin-bottom:12px">${c.after}</div>
-          ${browserFrame(rendered, { width: 650, height: 390 })}
+          ${driveFrame('report.html', embedded, { width: 650, height: 420 })}
         </div>`),
       1280, 800, out('1-before-after'), false
     );
 
-    // 2. The button.
+    // 2. In place.
     await shoot(
       page,
       slide(`
-        <div style="position:absolute;left:64px;top:220px">${headline(c.s2[0], c.s2[1], { width: 450, size: 42 })}</div>
-        <div style="position:absolute;left:560px;top:90px;width:660px">
-          ${sourceViewer('report.html', { lines: 22, height: 620, button: `<div style="position:absolute;right:26px;bottom:26px">${pill(c.button, 1.15)}</div>` })}
-        </div>`),
-      1280, 800, out('2-button'), false
+        <div style="position:absolute;left:64px;top:230px">${headline(c.s2[0], c.s2[1], { width: 430, size: 42 })}</div>
+        <div style="position:absolute;left:540px;top:150px">${driveFrame('report.html', embedded, { width: 680 })}</div>`),
+      1280, 800, out('2-in-place'), false
     );
 
     // 3. Source toggle.
@@ -225,14 +240,14 @@ async function store(page) {
         </div>
         <div style="position:absolute;left:80px;top:320px;width:560px;color:#e2d6cf;font:500 22px/1.6 ${FONT}">${c.tagline}</div>
         <div style="position:absolute;left:80px;top:410px;display:flex;flex-wrap:wrap;gap:10px;width:600px">${chips}</div>
-        <div style="position:absolute;left:720px;top:70px;transform:rotate(-1.5deg)">${browserFrame(rendered, { width: 640, height: 420 })}</div>
+        <div style="position:absolute;left:720px;top:50px;transform:rotate(-1.5deg)">${driveFrame('report.html', embedded, { width: 640, height: 460 })}</div>
       </div>`,
       1400, 560, out('promo-marquee'), false
     );
   }
 
   // README hero and GitHub social preview (English UI, bilingual copy lives in the README).
-  const rendered = await dataUrl('docs/images/shots/en/viewer-rendered.png', 'image/png');
+  const embeddedEn = await cropped('docs/images/shots/en/drive-embedded.png');
   await shoot(
     page,
     `<div style="position:relative;width:1280px;height:640px;overflow:hidden;background:${BG};font-family:${FONT}">
@@ -241,8 +256,8 @@ async function store(page) {
         <div style="color:#fff;font:800 50px/1.05 ${FONT};letter-spacing:-.02em">Drive HTML<br>Preview</div>
       </div>
       <div style="position:absolute;left:72px;top:290px;width:500px;color:#e2d6cf;font:500 20px/1.65 ${FONT}">Open Google Drive HTML files<br>as real web pages.<br>Google ドライブの HTML を、<br>そのまま Web ページに。</div>
-      <div style="position:absolute;left:72px;top:490px">${pill('Preview as web page', 1.1)}</div>
-      <div style="position:absolute;left:600px;top:80px;transform:rotate(-1.5deg)">${browserFrame(rendered, { width: 620, height: 440 })}</div>
+      
+      <div style="position:absolute;left:600px;top:70px;transform:rotate(-1.5deg)">${driveFrame('report.html', embeddedEn, { width: 620, height: 480 })}</div>
     </div>`,
     1280, 640, join(root, 'docs/images/social-preview.png'), false
   );

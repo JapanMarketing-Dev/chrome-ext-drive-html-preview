@@ -19,7 +19,9 @@ function row(id, name, kind = 'HTML') {
 // button is labelled with the file name) and the viewer dialog.
 function overlay(name, extra = '') {
   return `<div class="overlay"><div class="hdr"><span role="button" aria-label="${name} の名前を変更する"><span><span>${name}</span></span></span><span>外部</span><div>ファイル</div></div>` +
-    `<div role="dialog" aria-label="ビューアを表示しています。"><div role="main"><pre>&lt;a href="x.html"&gt;</pre><div>other.html</div></div>${extra}</div></div>`;
+    `<div role="dialog" aria-label="ビューアを表示しています。"><div role="main"><div class="scroll" style="overflow-y:auto">` +
+    `<div role="document"><pre>&lt;h1&gt;Hi&lt;/h1&gt;\n</pre></div><div role="document"><pre>&lt;p&gt;page 2&lt;/p&gt;</pre></div>` +
+    `</div><div>other.html</div></div>${extra}</div></div>`;
 }
 
 function dom(body, url = 'https://drive.google.com/drive/search?q=.html', title = '検索結果 - Google ドライブ') {
@@ -142,52 +144,126 @@ test('idsForName and itemNameOf', () => {
   assert.equal(C.itemNameOf(w.document.querySelector(`[data-id="${B}"]`)), null);
 });
 
-test('button is created once inside a shadow root and removed', () => {
-  const w = dom('');
-  let clicks = 0;
-  const host = C.ensureButton(w.document, () => clicks++);
-  assert.equal(C.ensureButton(w.document, () => {}), host);
-  assert.equal(w.document.querySelectorAll('#' + C.HOST_ID).length, 1);
-  const button = host.shadowRoot.querySelector('button');
-  assert.equal(button.textContent, 'Preview as web page');
-  button.click();
-  assert.equal(clicks, 1);
-  C.removeButton(w.document);
-  assert.equal(w.document.getElementById(C.HOST_ID), null);
-  C.removeButton(w.document);
-});
-
-test('controller: shows the button, sends the open message, hides on close', async () => {
-  const w = dom(`<table>${row(A, 'list.html')}${row(B, 'list.html')}</table>`);
-  const sent = [];
-  const ctl = C.createController(w.document, w, (m) => sent.push(m));
-  ctl.start();
-  assert.equal(w.document.getElementById(C.HOST_ID), null);
-
-  // User double-clicks the second list.html; Drive opens the overlay.
-  const name = w.document.querySelector(`[data-id="${B}"] strong`);
-  name.dispatchEvent(new w.MouseEvent('mousedown', { bubbles: true }));
-  w.document.body.insertAdjacentHTML('beforeend', overlay('list.html'));
-  await new Promise((r) => setTimeout(r, 400));
-
-  const host = w.document.getElementById(C.HOST_ID);
-  assert.ok(host, 'button shown');
-  host.shadowRoot.querySelector('button').click();
-  assert.deepEqual(sent, [{ type: 'open-preview', file: { id: B }, name: 'list.html' }]);
-
-  w.document.querySelector('[role=dialog]').remove();
-  await new Promise((r) => setTimeout(r, 400));
-  assert.equal(w.document.getElementById(C.HOST_ID), null, 'button removed');
-  assert.equal(ctl.getCurrent(), null);
-});
-
-test('controller: clicks on the button itself do not change the tracked row', async () => {
+test('findSourcePane: Drive text pages inside the overlay and their scroll area', () => {
   const w = dom(`<table>${row(A, 'a.html')}</table>${overlay('a.html')}`);
-  const ctl = C.createController(w.document, w, () => {});
+  const pane = C.findSourcePane(w.document);
+  assert.equal(pane.pages.length, 2);
+  assert.equal(pane.scroller.className, 'scroll');
+  assert.equal(C.sourceText(pane), '<h1>Hi</h1>\n<p>page 2</p>');
+});
+
+test('findSourcePane: file page without a dialog', () => {
+  const w = dom(`<div style="overflow-y:scroll" id="s"><div role="document"><pre>&lt;b&gt;x&lt;/b&gt;</pre></div></div>`, `https://drive.google.com/file/d/${A}/view`, 'a.html - Google ドライブ');
+  const pane = C.findSourcePane(w.document);
+  assert.equal(pane.scroller.id, 's');
+  assert.equal(C.sourceText(pane), '<b>x</b>');
+});
+
+test('findSourcePane: nothing while Drive is still loading or shows something else', () => {
+  assert.equal(C.findSourcePane(dom('<div style="overflow-y:auto"><div role="document"></div></div>').document), null, 'no text yet');
+  assert.equal(C.findSourcePane(dom('<div role="document"><pre>x</pre></div>').document), null, 'no scroll area');
+  const hidden = dom('<div style="overflow-y:auto"><div role="document" style="display:none"><pre>x</pre></div></div>');
+  assert.equal(C.findSourcePane(hidden.document), null);
+});
+
+test('frameRect leaves room for the arrows on wide screens only', () => {
+  const el = (left, top, width, height) => ({ getBoundingClientRect: () => ({ left, top, width, height }) });
+  assert.deepEqual(C.frameRect(el(0, 128, 1375, 672)), { left: C.SIDE_GAP, top: 128, width: 1375 - C.SIDE_GAP * 2, height: 672 });
+  assert.deepEqual(C.frameRect(el(10, 50, 400, 300)), { left: 10, top: 50, width: 400, height: 300 });
+});
+
+test('ensureEmbed: one frame, src follows the file, style only rewritten on change', () => {
+  const w = dom('');
+  const rect = { left: 72, top: 128, width: 1231, height: 672 };
+  const host = C.ensureEmbed(w.document, { id: A }, 'a.html', rect);
+  const frame = host.querySelector('iframe');
+  assert.equal(frame.getAttribute('src'), `viewer.html?embed=1&id=${A}&name=a.html`);
+  assert.match(host.style.cssText, /position: fixed/);
+  assert.equal(host.style.left, '72px');
+  const css = host.dataset.css;
+  assert.equal(C.ensureEmbed(w.document, { id: A }, 'a.html', rect), host);
+  assert.equal(host.dataset.css, css);
+  C.ensureEmbed(w.document, { id: B, authuser: '1' }, 'b.html', { ...rect, height: 500 });
+  assert.equal(w.document.querySelectorAll('#' + C.HOST_ID).length, 1);
+  assert.equal(host.querySelector('iframe'), frame, 'same frame reused');
+  assert.equal(frame.getAttribute('src'), `viewer.html?embed=1&id=${B}&authuser=1&name=b.html`);
+  assert.equal(host.style.height, '500px');
+  C.removeEmbed(w.document);
+  assert.equal(w.document.getElementById(C.HOST_ID), null);
+  C.removeEmbed(w.document);
+});
+
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+test('controller: lays the page over the preview, follows navigation, removes on close', async () => {
+  const w = dom(`<table>${row(A, 'list.html')}${row(B, 'list.html')}${row(X, 'next.html')}</table>`);
+  const ctl = C.createController(w.document, w);
   ctl.start();
-  ctl.setLastActivated(A);
-  const host = w.document.getElementById(C.HOST_ID);
-  host.dispatchEvent(new w.MouseEvent('mousedown', { bubbles: true }));
-  ctl.refresh();
+  assert.equal(w.document.getElementById(C.HOST_ID), null);
+
+  w.document.querySelector(`[data-id="${B}"] strong`).dispatchEvent(new w.MouseEvent('mousedown', { bubbles: true }));
+  w.document.body.insertAdjacentHTML('beforeend', overlay('list.html'));
+  await wait(300);
+  const frame = w.document.querySelector(`#${C.HOST_ID} iframe`);
+  assert.ok(frame, 'embedded');
+  assert.match(frame.getAttribute('src'), new RegExp(`id=${B}`));
+
+  // Drive's "next" arrow swaps the header and the pages in place.
+  const header = w.document.querySelector('.hdr [role=button]');
+  header.setAttribute('aria-label', 'next.html の名前を変更する');
+  header.querySelector('span span').textContent = 'next.html';
+  await wait(300);
+  assert.match(w.document.querySelector(`#${C.HOST_ID} iframe`).getAttribute('src'), new RegExp(`id=${X}&name=next.html`));
+
+  w.document.querySelector('.overlay').remove();
+  await wait(300);
+  assert.equal(w.document.getElementById(C.HOST_ID), null);
+});
+
+test('controller: no overlay for HTML files until Drive has drawn the text pages', async () => {
+  const w = dom(`<table>${row(A, 'a.html')}</table><div class="overlay"><span role="button" aria-label="a.html の名前を変更する"><span>a.html</span></span><div role="dialog"><div class="spinner"></div></div></div>`);
+  const ctl = C.createController(w.document, w);
+  ctl.start();
+  assert.equal(w.document.getElementById(C.HOST_ID), null);
   assert.equal(ctl.getCurrent().file.id, A);
+  w.document.querySelector('.spinner').outerHTML = '<div style="overflow-y:auto"><div role="document"><pre>&lt;p&gt;x&lt;/p&gt;</pre></div></div>';
+  await wait(300);
+  assert.ok(w.document.getElementById(C.HOST_ID));
+});
+
+test('controller: hands Drive\'s text to its own frame only', async () => {
+  const w = dom(`<table>${row(A, 'a.html')}</table>${overlay('a.html')}`);
+  const ctl = C.createController(w.document, w);
+  ctl.start();
+  const frame = w.document.querySelector(`#${C.HOST_ID} iframe`);
+  const replies = [];
+  const fakeFrameWindow = { postMessage: (data, origin) => replies.push([data, origin]) };
+  Object.defineProperty(frame, 'contentWindow', { value: fakeFrameWindow });
+  w.dispatchEvent(new w.MessageEvent('message', { data: { type: 'dhp-need-text' }, source: {} }));
+  assert.equal(replies.length, 0, 'ignores other windows');
+  w.dispatchEvent(new w.MessageEvent('message', { data: { type: 'other' }, source: fakeFrameWindow }));
+  assert.equal(replies.length, 0, 'ignores other messages');
+  w.dispatchEvent(new w.MessageEvent('message', { data: { type: 'dhp-need-text' }, source: fakeFrameWindow }));
+  assert.deepEqual(replies[0][0], { type: 'dhp-text', text: '<h1>Hi</h1>\n<p>page 2</p>' });
+});
+
+test('controller: reacts to attribute-only changes elsewhere on the page', async () => {
+  const w = dom(`<table>${row(A, 'a.html')}</table>${overlay('a.html')}`);
+  const ctl = C.createController(w.document, w);
+  ctl.start();
+  assert.ok(w.document.getElementById(C.HOST_ID));
+  w.document.querySelector('[role=dialog]').setAttribute('aria-hidden', 'true');
+  await wait(300);
+  assert.equal(w.document.getElementById(C.HOST_ID), null);
+});
+
+test('controller: its own style writes do not keep it busy', async () => {
+  const w = dom(`<table>${row(A, 'a.html')}</table>${overlay('a.html')}`);
+  let refreshes = 0;
+  const realSetTimeout = w.setTimeout.bind(w);
+  w.setTimeout = (fn, ms) => realSetTimeout(() => { refreshes++; fn(); }, ms);
+  const ctl = C.createController(w.document, w);
+  ctl.start();
+  await wait(800);
+  assert.ok(refreshes <= 1, `refreshed ${refreshes} times`);
 });

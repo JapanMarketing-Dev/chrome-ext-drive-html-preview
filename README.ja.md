@@ -4,8 +4,8 @@
 
 # Drive HTML Preview
 
-**Google ドライブの HTML ファイルを、ソースではなく本来の Web ページとして開く Chrome 拡張機能。**<br>
-Drive にボタンがひとつ増えるだけ。押せば隣のタブにページが表示されます。スクリプトも動き、文字コードも自動判別。データはどこにも送りません。
+**Google ドライブのプレビューで、HTML ファイルがソースではなく本来の Web ページとして表示される Chrome 拡張機能。**<br>
+Drive で `.html` をダブルクリックするだけで、その場にページが表示されます。スクリプトも動き、文字コードも自動判別。データはどこにも送りません。
 
 [![Chrome Web Store](https://img.shields.io/badge/Chrome%20Web%20Store-Drive%20HTML%20Preview-e34f26?style=flat&logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/search/Drive%20HTML%20Preview)
 [![Release](https://img.shields.io/github/v/release/JapanMarketing-Dev/chrome-ext-drive-html-preview?style=flat&color=f06529&label=release)](https://github.com/JapanMarketing-Dev/chrome-ext-drive-html-preview/releases)
@@ -27,21 +27,19 @@ Drive にボタンがひとつ増えるだけ。押せば隣のタブにペー�
 
 ## Drive は HTML を文字で見せる。これはページで見せる。
 
-Google ドライブで `.html` を開くと、表示されるのはタグの羅列です。ツールから書き出したレポート、試作画面、メールマガジン、AI が作ったページ……どれもダウンロードしてローカルで開くまで読めません。
+Google ドライブで `.html` をプレビューすると、表示されるのはタグの羅列です。ツールから書き出したレポート、試作画面、メールマガジン、AI が作ったページ……これまでは、ひとつずつダウンロードしてデスクトップで開くしかありませんでした（Slack ではプレビューできるのに、Drive ではできない）。
 
-Drive HTML Preview を入れると、Drive で HTML ファイルを開いたときに **「Web ページとして表示」** ボタンが出ます。押すと、隣のタブにきちんと描画されたページが開きます。
+Drive HTML Preview を入れると、Drive のプレビューがそのままページになります。ボタンを押す必要もありません。
 
-<img src="docs/images/store/ja/1-before-after.png" width="100%" alt="変更前：Drive は HTML のソースを表示。変更後：同じファイルが Web ページとして表示される。">
+<img src="docs/images/store/ja/1-before-after.png" width="100%" alt="変更前：Drive のプレビューは HTML のソースを表示。変更後：同じプレビューにページが表示される。">
 
-## 開いたその場に、ボタンがひとつ
+## ダブルクリックするだけ。ダウンロード不要。
 
-ボタンは Drive のプレビュー（フォルダでファイルをダブルクリックしたとき）と、ファイルページ（`drive.google.com/file/d/…`）に表示されます。ほかにも：
+Drive がファイルをプレビューする場所ならどこでも動きます。フォルダでダブルクリックしたときのプレビュー、検索結果、共有ドライブ、ファイルページ（`drive.google.com/file/d/…`）。Drive の矢印で次のファイルに移ると、表示も切り替わります。
 
-- Drive で HTML を開いた状態で、拡張機能の **ツールバーアイコン** を押す
-- Gmail や Slack などにある **Drive のファイルリンクを右クリック** して「Drive の HTML を Web ページとしてプレビュー」を選ぶ
-- どこでもツールバーアイコンを押して、**Drive のリンクを貼り付ける**
+右上の小さなスイッチで、ページとソースの切り替えや、新しいタブでの全画面表示ができます。ツールバーのアイコンからも、今のファイルを新しいタブで開いたり、Drive のリンクを貼り付けて開いたりできます。
 
-<img src="docs/images/store/ja/2-button.png" width="100%" alt="HTML ソースを表示しているファイルの右下に「Web ページとして表示」ボタン">
+<img src="docs/images/store/ja/2-in-place.png" width="100%" alt="Drive のプレビューに HTML のレポートがそのまま表示されている画面">
 
 ## ページとコードをワンクリックで切り替え
 
@@ -56,7 +54,7 @@ Drive HTML Preview を入れると、Drive で HTML ファイルを開いたと�
 | | |
 |---|---|
 | **サンドボックス表示**　HTML は拡張機能から隔離された、オリジンを持たないサンドボックスで動きます。拡張機能・Drive のログイン状態・ほかのタブには触れられません。 | **サーバーなし**　ファイルはあなたのブラウザが、あなたのログイン状態で Drive から直接読み込みます。解析・広告・アカウント連携はありません。 |
-| **最小限の権限**　必要なのは `drive.google.com` / `drive.usercontent.google.com` へのアクセスと、右クリックメニューひとつだけ。 | **開けるものはそのまま開ける**　共有ドライブ、共有されたファイル、複数アカウントのログイン（`/u/1/`）、リソースキー付きのリンクにも対応。 |
+| **最小限の権限**　必要なのは `drive.google.com` / `drive.usercontent.google.com` へのアクセスだけです。 | **開けるものはそのまま開ける**　共有ドライブ、共有されたファイル、複数アカウントのログイン（`/u/1/`）、リソースキー付きのリンクにも対応。 |
 
 ## インストール
 
@@ -71,22 +69,22 @@ Drive HTML Preview を入れると、Drive で HTML ファイルを開いたと�
 ## しくみ
 
 ```
-Drive の画面 ──(ファイル ID と名前)──▶ content script ──▶ service worker ──▶ ビューアのタブ
-                                                                              │
-                      drive.google.com/uc?export=download&id=…  ◀─────────────┘  あなたのログインで取得
-                                                                              │
-                                        サンドボックス iframe ◀── 文字コード変換後の HTML ┘
+Drive のプレビュー ──(ファイル ID と名前)──▶ content script ──▶ Drive の紙面の上にフレームを重ねる
+                                                                  │  viewer.html?embed=1
+            drive.google.com/uc?export=download&id=…  ◀───────────┤  あなたのログインで取得
+            （取得できないときは Drive が表示している本文を使う）     │
+                                   サンドボックス iframe ◀── 文字コード変換後の HTML
 ```
 
-- `src/content.js` が画面上の HTML ファイルを特定します。ファイルページでは URL から、プレビューでは表示中のファイル名と開いた一覧の項目を照合します。
-- `src/viewer.js` がファイルをダウンロードし、文字コードを判定して（`src/lib/html.js`）、オリジンを持たないサンドボックスページ `src/sandbox.html` に渡します。
+- `src/content.js` が画面上の HTML ファイルを特定し（ファイルページでは URL から、プレビューでは表示中のファイル名と開いた一覧の項目を照合）、Drive がソースを表示している紙面の上にフレームを重ねます。
+- `src/viewer.js` がファイルをダウンロードし、文字コードを判定して（`src/lib/html.js`）、オリジンを持たないサンドボックスページ `src/sandbox.html` に渡します。ダウンロードできないときは、Drive が画面に表示している本文を使います。
 - 外部サイトへのリンクは新しいタブで開きます。Drive の別ファイルを指す相対リンクや画像は、Drive のファイルごとに ID が違うため解決できません。
 
 ### 制限
 
 - Drive 上の別ファイルへの相対パス（`./style.css`、`images/a.png` など）は読み込めません。インライン化するか、絶対 URL を使ってください。
 - 50 MB を超えるファイルは表示しません。
-- オーナーが閲覧者のダウンロードを禁止している場合、拡張機能もファイルを取得できません。
+- オーナーが閲覧者のダウンロードを禁止している場合は、Drive が表示している本文で描画します（非常に長いファイルは Drive 側で途中までしか表示されないことがあります）。
 
 ## 開発
 

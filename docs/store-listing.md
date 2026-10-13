@@ -8,9 +8,9 @@ Package: `npm run build` → `dist/drive-html-preview-<version>.zip`.
 | Field | Value |
 |---|---|
 | Category | Tools (ツール) |
-| Language | Japanese (default), English |
+| Language | Japanese (default, from `default_locale`), English |
 | Store icon | `src/icons/icon-128.png` |
-| Screenshots (1280×800) | `docs/images/store/<lang>/1-before-after.png`, `2-button.png`, `3-source.png`, `4-privacy.png` |
+| Screenshots (1280×800) | `docs/images/store/<lang>/1-before-after.png`, `2-in-place.png`, `3-source.png`, `4-privacy.png` |
 | Small promo tile (440×280) | `docs/images/store/<lang>/promo-small.png` |
 | Marquee promo tile (1400×560) | `docs/images/store/<lang>/promo-marquee.png` |
 | Homepage URL | https://github.com/JapanMarketing-Dev/chrome-ext-drive-html-preview |
@@ -20,16 +20,15 @@ Package: `npm run build` → `dist/drive-html-preview-<version>.zip`.
 ### Description (日本語)
 
 ```
-Google ドライブで HTML ファイルを開くと、ページではなくタグだらけのソースが表示されます。Drive HTML Preview は、その HTML をワンクリックで本来の Web ページとして表示する拡張機能です。
+Google ドライブで HTML ファイルをプレビューすると、ページではなくタグだらけのソースが表示されます。いちいちダウンロードしてデスクトップで開き直していませんか？ Drive HTML Preview を入れると、Drive のプレビューがそのまま本来の Web ページとして表示されます。
 
 ■ できること
-・Drive で HTML ファイルを開くと「Web ページとして表示」ボタンが出ます。押すと隣のタブにページが表示されます
-・フォルダでのプレビュー（ダブルクリック）と、ファイルページ（drive.google.com/file/d/…）の両方に対応
-・ツールバーのアイコン、Drive リンクの右クリックメニュー、リンクの貼り付けからも開けます
+・Drive で .html ファイルをダブルクリックするだけ。プレビューの中に、描画されたページがそのまま表示されます
+・フォルダ、検索結果、共有ドライブのプレビューと、ファイルページ（drive.google.com/file/d/…）に対応。Drive の矢印で次のファイルに移っても追従します
+・右上のスイッチで、ページとソースをワンクリックで切り替え。新しいタブでの全画面表示もできます
 ・JavaScript もそのまま動きます。CDN から読み込むライブラリも使えます
-・プレビューとソースをワンクリックで切り替え
 ・文字コードを自動判別（UTF-8、Shift_JIS、EUC-JP など）
-・共有ドライブ、共有されたファイル、複数アカウントのログインに対応
+・共有されたファイル、複数アカウントのログインにも対応
 
 ■ プライバシー
 ・ファイルはあなたのブラウザが、あなたのログイン状態で Google ドライブから直接読み込みます
@@ -39,7 +38,6 @@ Google ドライブで HTML ファイルを開くと、ページではなくタ�
 ■ 制限
 ・Drive 上の別ファイルへの相対パス（CSS や画像）は読み込めません
 ・50 MB を超えるファイルは表示しません
-・オーナーがダウンロードを禁止しているファイルは表示できません
 
 オープンソース（MIT ライセンス）：https://github.com/JapanMarketing-Dev/chrome-ext-drive-html-preview
 ```
@@ -47,16 +45,15 @@ Google ドライブで HTML ファイルを開くと、ページではなくタ�
 ### Description (English)
 
 ```
-Google Drive shows HTML files as raw source code. Drive HTML Preview opens them as the real web page in one click.
+Google Drive previews HTML files as raw source code, so you end up downloading each one and opening it on your desktop. With Drive HTML Preview, Drive's own preview shows the real web page instead.
 
 WHAT IT DOES
-• Open an HTML file in Google Drive and a “Preview as web page” button appears. Click it and the rendered page opens in the next tab.
-• Works on Drive's preview overlay (double-click a file in a folder) and on file pages (drive.google.com/file/d/…).
-• Also opens from the toolbar icon, from the right-click menu on any Drive file link, or by pasting a Drive link.
+• Just double-click an .html file in Google Drive. The rendered page appears right inside the preview.
+• Works in folders, search results, shared drives and on file pages (drive.google.com/file/d/…), and follows Drive's next / previous arrows.
+• A small switch flips between the page and its source, or opens it in a full tab.
 • JavaScript runs, including libraries loaded from a CDN.
-• Switch between the rendered page and its source.
 • Detects the character encoding automatically (UTF-8, Shift_JIS, EUC-JP and more).
-• Works with shared drives, files shared with you, and multiple signed-in accounts.
+• Works with files shared with you and with multiple signed-in accounts.
 
 PRIVACY
 • Your browser downloads the file straight from Google Drive with your own sign-in.
@@ -66,7 +63,6 @@ PRIVACY
 LIMITATIONS
 • Relative paths to other Drive files (CSS, images) can't be loaded.
 • Files over 50 MB aren't previewed.
-• Files whose owner turned off downloading can't be previewed.
 
 Open source (MIT): https://github.com/JapanMarketing-Dev/chrome-ext-drive-html-preview
 ```
@@ -76,29 +72,22 @@ Open source (MIT): https://github.com/JapanMarketing-Dev/chrome-ext-drive-html-p
 ### Single purpose
 
 ```
-Google ドライブに保存された HTML ファイルを、ソースコードではなく Web ページとして表示すること。
-Display HTML files stored in Google Drive as rendered web pages instead of raw source code.
+Google ドライブのプレビューで、HTML ファイルをソースコードではなく Web ページとして表示すること。
+Show HTML files in Google Drive's preview as rendered web pages instead of raw source code.
 ```
 
 ### Permission justifications
 
-**contextMenus**
-
-```
-Drive のファイルリンクを右クリックしたときに「Drive の HTML を Web ページとしてプレビュー」メニューを追加するためだけに使います。
-Adds a single "Preview Drive HTML as a web page" item to the right-click menu on Google Drive file links.
-```
-
 **Host permissions (https://drive.google.com/\*, https://drive.usercontent.google.com/\*)**
 
 ```
-drive.google.com：Drive の画面で開いている HTML ファイルを特定し「Web ページとして表示」ボタンを出すため、およびユーザーが表示を選んだファイルをダウンロードするため（/uc?export=download）。
+drive.google.com：Drive のプレビューで開かれている HTML ファイルを特定し、その上に描画したページを重ねて表示するため、およびそのファイルをダウンロードするため（/uc?export=download）。
 drive.usercontent.google.com：Drive のダウンロードは必ずこのホストへリダイレクトされるため、ファイル本体の取得に必要です。
-どちらもユーザーが操作したファイルだけを対象にし、内容はブラウザ内で表示するだけで外部に送信しません。
+どちらもユーザーがプレビューしているファイルだけを対象にし、内容はブラウザ内で表示するだけで外部に送信しません。
 
-drive.google.com: to detect the HTML file open on Drive, show the "Preview as web page" button, and download the file the user chose to preview (/uc?export=download).
+drive.google.com: to detect the HTML file open in Drive's preview, show the rendered page over it, and download that file (/uc?export=download).
 drive.usercontent.google.com: Drive redirects every download to this host, so it is needed to receive the file contents.
-Only the file the user acts on is fetched; its contents are displayed locally and never sent anywhere.
+Only the file the user is previewing is fetched; its contents are displayed locally and never sent anywhere.
 ```
 
 **Remote code**

@@ -1,5 +1,5 @@
-// Runs on drive.google.com. Finds the HTML file being viewed and offers a button
-// that opens it rendered in the extension's viewer.
+// Runs on drive.google.com. When Drive previews an HTML file (which it shows as
+// source text), lays the rendered page over Drive's text page, in place.
 (function () {
   'use strict';
 
@@ -106,112 +106,153 @@
     return { file, name, activatedId: lastActivatedId };
   }
 
-  function label(key, fallback) {
-    try {
-      return (globalThis.chrome && chrome.i18n && chrome.i18n.getMessage(key)) || fallback;
-    } catch (_) {
-      return fallback;
+  // The scrollable area that holds Drive's text pages for the file on screen.
+  function scrollParent(el) {
+    const view = el.ownerDocument.defaultView;
+    for (let p = el.parentElement; p && p !== el.ownerDocument.body; p = p.parentElement) {
+      const overflow = view.getComputedStyle(p).overflowY;
+      if (overflow === 'auto' || overflow === 'scroll') return p;
     }
+    return null;
   }
 
-  const BUTTON_CSS = `
-    :host { all: initial; }
-    button {
-      position: fixed; right: 24px; bottom: 24px; z-index: 2147483647;
-      display: inline-flex; align-items: center; gap: 10px;
-      padding: 12px 18px 12px 14px; border: 0; border-radius: 999px;
-      background: #D2441F; color: #fff; cursor: pointer;
-      font: 600 14px/1.2 "Google Sans", Roboto, "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif;
-      letter-spacing: .01em;
-      box-shadow: 0 6px 20px rgba(227, 79, 38, .35), 0 2px 6px rgba(0, 0, 0, .25);
-      transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
-    }
-    button:hover { background: #B5361A; transform: translateY(-1px); box-shadow: 0 10px 26px rgba(227, 79, 38, .42), 0 3px 8px rgba(0, 0, 0, .25); }
-    button:active { transform: translateY(0); }
-    button:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
-    svg { width: 20px; height: 20px; flex: none; }
-    @media (prefers-reduced-motion: reduce) { button { transition: none; } }
-  `;
+  // Drive shows text files as one or more [role=document] pages holding a <pre>.
+  // In a folder the pages sit inside the preview overlay's dialog.
+  function findSourcePane(doc) {
+    const dialog = [...doc.querySelectorAll('[role="dialog"]')].filter(isVisible).find((d) => d.querySelector('[role="document"] pre'));
+    const scope = dialog || doc;
+    const pages = [...scope.querySelectorAll('[role="document"]')].filter((page) => page.querySelector('pre') && isVisible(page));
+    if (!pages.length) return null;
+    const scroller = scrollParent(pages[0]);
+    if (!scroller) return null;
+    return { pages, scroller };
+  }
 
-  const BUTTON_ICON =
-    '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M8 7l-5 5 5 5M16 7l5 5-5 5"/><path fill="currentColor" d="M10.5 9.2v5.6c0 .5.5.8.9.5l4.3-2.8c.4-.2.4-.8 0-1l-4.3-2.8c-.4-.3-.9 0-.9.5z"/></svg>';
+  function sourceText(pane) {
+    return pane.pages.map((page) => [...page.querySelectorAll('pre')].map((pre) => pre.textContent).join('')).join('');
+  }
 
-  function ensureButton(doc, onClick) {
+  // Leaves room for Drive's previous / next arrows at the sides of the overlay.
+  const SIDE_GAP = 72;
+
+  function frameRect(scroller) {
+    const r = scroller.getBoundingClientRect();
+    const gap = r.width > SIDE_GAP * 2 + 320 ? SIDE_GAP : 0;
+    return { left: r.left + gap, top: r.top, width: Math.max(0, r.width - gap * 2), height: r.height };
+  }
+
+  function embedUrl(file, name) {
+    const base = globalThis.chrome && chrome.runtime && chrome.runtime.getURL ? chrome.runtime.getURL('viewer.html') : 'viewer.html';
+    return `${base}?embed=1&${D.buildViewerQuery(file, name)}`;
+  }
+
+  function ensureEmbed(doc, file, name, rect) {
     let host = doc.getElementById(HOST_ID);
-    if (host) return host;
-    host = doc.createElement('div');
-    host.id = HOST_ID;
-    const shadow = host.attachShadow({ mode: 'open' });
-    const style = doc.createElement('style');
-    style.textContent = BUTTON_CSS;
-    const button = doc.createElement('button');
-    button.type = 'button';
-    button.innerHTML = BUTTON_ICON;
-    const text = doc.createElement('span');
-    text.textContent = label('previewButton', 'Preview as web page');
-    button.append(text);
-    button.title = label('previewButtonTitle', 'Render this HTML file in a new tab');
-    button.addEventListener('click', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      onClick();
-    });
-    shadow.append(style, button);
-    (doc.body || doc.documentElement).append(host);
+    const src = embedUrl(file, name);
+    if (!host) {
+      host = doc.createElement('div');
+      host.id = HOST_ID;
+      const frame = doc.createElement('iframe');
+      frame.title = name;
+      frame.setAttribute('allow', 'clipboard-write');
+      frame.style.cssText = 'display:block;width:100%;height:100%;border:0;background:#fff;color-scheme:light';
+      host.append(frame);
+      (doc.body || doc.documentElement).append(host);
+    }
+    const frame = host.firstElementChild;
+    if (frame.getAttribute('src') !== src) {
+      frame.setAttribute('src', src);
+      frame.title = name;
+    }
+    const css =
+      `position:fixed;z-index:2147483000;left:${rect.left}px;top:${rect.top}px;width:${rect.width}px;height:${rect.height}px;` +
+      'background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);';
+    // Only touch the style when it changes, so the page observer doesn't loop on our writes.
+    if (host.dataset.css !== css) {
+      host.dataset.css = css;
+      host.style.cssText = css;
+    }
     return host;
   }
 
-  function removeButton(doc) {
+  function removeEmbed(doc) {
     const host = doc.getElementById(HOST_ID);
     if (host) host.remove();
   }
 
-  function createController(doc, win, send) {
+  function createController(doc, win) {
     let current = null;
     let lastActivatedId = null;
     let timer = null;
-
-    function openCurrent() {
-      if (!current) return;
-      send({ type: 'open-preview', file: current.file, name: current.name });
-    }
+    let pane = null;
+    let observed = null;
+    const resizeObserver = win.ResizeObserver ? new win.ResizeObserver(() => schedule()) : null;
 
     function refresh() {
       timer = null;
       const next = detectCurrentFile(doc, win.location.href, lastActivatedId, current);
-      if (!next) {
-        current = null;
-        removeButton(doc);
+      pane = next ? findSourcePane(doc) : null;
+      if (!next || !pane) {
+        current = next;
+        removeEmbed(doc);
         return;
       }
       current = next;
-      ensureButton(doc, openCurrent);
+      ensureEmbed(doc, next.file, next.name, frameRect(pane.scroller));
+      if (resizeObserver && observed !== pane.scroller) {
+        if (observed) resizeObserver.unobserve(observed);
+        observed = pane.scroller;
+        resizeObserver.observe(observed);
+      }
     }
 
     function schedule() {
-      if (timer === null) timer = win.setTimeout(refresh, 250);
+      if (timer === null) timer = win.setTimeout(refresh, 150);
     }
 
     function track(event) {
       const target = event.target;
       if (!target || !target.closest) return;
-      if (target.closest('#' + HOST_ID)) return;
       const item = target.closest('[data-id]');
       if (!item) return;
       const id = item.getAttribute('data-id');
       if (D.isValidId(id) && itemNameOf(item)) lastActivatedId = id;
     }
 
+    // The viewer asks for Drive's own copy of the text when it can't download the file.
+    function onMessage(event) {
+      const host = doc.getElementById(HOST_ID);
+      const frame = host && host.firstElementChild;
+      if (!frame || event.source !== frame.contentWindow) return;
+      if (!event.data || event.data.type !== 'dhp-need-text') return;
+      const text = pane ? sourceText(pane) : '';
+      let origin = '*';
+      try {
+        origin = new URL(frame.src).origin;
+      } catch (_) {
+        /* keep '*' */
+      }
+      frame.contentWindow.postMessage({ type: 'dhp-text', text }, origin === 'null' ? '*' : origin);
+    }
+
     function start() {
       doc.addEventListener('mousedown', track, true);
       doc.addEventListener('keydown', (e) => (e.key === 'Enter' || e.key === ' ') && track(e), true);
-      new win.MutationObserver(schedule).observe(doc.documentElement, {
+      const ownHost = (node) => node.id === HOST_ID || (node.closest && node.closest('#' + HOST_ID));
+      new win.MutationObserver((records) => {
+        const ours = (r) =>
+          ownHost(r.target) || (r.type === 'childList' && [...r.addedNodes, ...r.removedNodes].every((n) => n.id === HOST_ID));
+        if (records.every(ours)) return;
+        schedule();
+      }).observe(doc.documentElement, {
         childList: true,
         subtree: true,
         attributes: true,
         attributeFilter: ['aria-hidden', 'style', 'class'],
       });
+      win.addEventListener('resize', schedule);
       win.addEventListener('popstate', schedule);
+      win.addEventListener('message', onMessage);
       refresh();
     }
 
@@ -225,13 +266,17 @@
 
   const core = {
     HOST_ID,
+    SIDE_GAP,
     findOverlayName,
     idsForName,
     itemNameOf,
     detectCurrentFile,
+    findSourcePane,
+    sourceText,
+    frameRect,
     createController,
-    ensureButton,
-    removeButton,
+    ensureEmbed,
+    removeEmbed,
   };
 
   if (isNode) {
@@ -240,9 +285,7 @@
   }
 
   if (window.top !== window) return;
-  const controller = createController(document, window, (message) => {
-    chrome.runtime.sendMessage(message).catch(() => {});
-  });
+  const controller = createController(document, window);
   controller.start();
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (message && message.type === 'get-current-file') {

@@ -191,3 +191,28 @@ main { position: relative; flex: 1; min-height: 0; display: flex; }
   .segmented button { padding: 5px 10px; }
   .url-form { flex-direction: column; }
 }
+
+/* Embedded over Drive's preview: no top bar, a small floating switcher instead. */
+body.embed { background: #fff; }
+body.embed .bar { display: none; }
+.mini {
+  position: fixed;
+  top: 10px;
+  right: 14px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: 0 4px 14px rgba(0,0,0,.18);
+  opacity: .92;
+  transition: opacity .15s ease;
+}
+.mini:hover { opacity: 1; }
+.mini .segmented { border: 0; padding: 0; background: transparent; }
+.mini .icon-btn { width: 30px; height: 30px; }
+.mini .icon-btn svg { width: 17px; height: 17px; }
+body.embed .panel { border: 0; }

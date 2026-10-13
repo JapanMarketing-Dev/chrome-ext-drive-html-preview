@@ -8,6 +8,7 @@
   const $ = (id) => document.getElementById(id);
   const t = (key, subs) => chrome.i18n.getMessage(key, subs) || key;
 
+  const embedded = new URLSearchParams(location.search).get('embed') === '1' && window.parent !== window;
   const state = { file: null, name: '', html: '', mode: 'rendered', frameListener: null };
 
   function localize() {
@@ -87,8 +88,8 @@
 
   function setMode(mode) {
     state.mode = mode;
-    $('modeRendered').setAttribute('aria-selected', String(mode === 'rendered'));
-    $('modeSource').setAttribute('aria-selected', String(mode === 'source'));
+    for (const id of ['modeRendered', 'miniRendered']) $(id).setAttribute('aria-selected', String(mode === 'rendered'));
+    for (const id of ['modeSource', 'miniSource']) $(id).setAttribute('aria-selected', String(mode === 'source'));
     if (mode === 'source') {
       $('source').textContent = state.html;
       show('source');
@@ -97,20 +98,45 @@
     }
   }
 
+  // Inside Drive's preview, Drive has already put the file's text on the page; use it
+  // when the download itself isn't allowed.
+  function textFromDrive() {
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => done(''), 3000);
+      function done(text) {
+        clearTimeout(timer);
+        window.removeEventListener('message', onReply);
+        resolve(text);
+      }
+      function onReply(event) {
+        if (event.source !== window.parent || event.origin !== 'https://drive.google.com') return;
+        if (event.data && event.data.type === 'dhp-text') done(typeof event.data.text === 'string' ? event.data.text : '');
+      }
+      window.addEventListener('message', onReply);
+      window.parent.postMessage({ type: 'dhp-need-text' }, 'https://drive.google.com');
+    });
+  }
+
   async function load() {
     show('loading');
     $('actions').hidden = true;
+    $('mini').hidden = true;
     $('charset').hidden = true;
-    const result = await download(state.file);
+    let result = await download(state.file);
+    if (result.error && embedded) {
+      const text = await textFromDrive();
+      if (text.trim()) result = { text, charset: '', label: t('fromDrive'), name: '' };
+    }
     if (result.error) return showError(result.error);
 
     state.html = result.text;
     if (result.name) state.name = result.name;
     setTitle(state.name);
-    $('charset').textContent = result.charset.toUpperCase();
+    $('charset').textContent = result.label || result.charset.toUpperCase();
     $('charset').hidden = false;
     $('openDrive').href = D.buildDriveViewUrl(state.file);
     $('actions').hidden = false;
+    $('mini').hidden = !embedded;
     renderInFrame(state.html);
     setMode(state.mode);
   }
@@ -127,8 +153,11 @@
 
   function init() {
     localize();
+    if (embedded) document.body.classList.add('embed');
     $('modeRendered').addEventListener('click', () => setMode('rendered'));
     $('modeSource').addEventListener('click', () => setMode('source'));
+    $('miniRendered').addEventListener('click', () => setMode('rendered'));
+    $('miniSource').addEventListener('click', () => setMode('source'));
     $('reload').addEventListener('click', load);
     $('retry').addEventListener('click', load);
     $('urlForm').addEventListener('submit', openFromInput);
@@ -143,6 +172,7 @@
     }
     state.file = parsed.file;
     state.name = parsed.name;
+    $('openTab').href = location.pathname + '?' + D.buildViewerQuery(parsed.file, parsed.name);
     setTitle(state.name);
     load();
   }

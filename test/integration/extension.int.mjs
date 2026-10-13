@@ -42,6 +42,8 @@ async function drivePage(route, title, body) {
   await route.fulfill({
     status: 200,
     contentType: 'text/html; charset=utf-8',
+    // Drive limits frames to Google hosts; the extension's frame must still load.
+    headers: { 'content-security-policy': "frame-src 'self' https://*.google.com; script-src 'self' 'unsafe-inline'" },
     body: `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title></head><body>${body}</body></html>`,
   });
 }
@@ -104,16 +106,28 @@ before(async () => {
   });
   await context.route('https://accounts.google.com/**', (route) => drivePage(route, 'Sign in', 'sign in'));
 
-  // Minimal stand-ins for Drive pages so the content script has something to work on.
+  // Minimal stand-ins for Drive's viewer: a header, then a scroll area holding the
+  // file's text as [role=document] pages, like Drive renders text files.
+  const viewerMarkup = (name, text, inDialog) => {
+    const pages = `<div id="scroll" style="position:fixed;left:0;right:0;top:128px;bottom:0;overflow-y:auto;background:#525659">
+      <div role="document" style="width:900px;margin:20px auto;background:#fff;padding:20px"><pre>${text.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</pre></div></div>`;
+    const header = `<div style="height:64px;background:#222;color:#fff"><span role="button" aria-label="${name} の名前を変更する"><span><span>${name}</span></span></span></div>`;
+    return inDialog ? `<div class="overlay">${header}<div role="dialog" aria-label="ビューアを表示しています。">${pages}</div></div>` : header + pages;
+  };
+  globalThis.__viewerMarkup = viewerMarkup;
+  const demoText = demo.toString('utf8');
   await context.route(`https://drive.google.com/file/d/**`, (route) => {
-    const name = /sjis/.test(route.request().url()) ? 'sjis-sample.html' : 'drive-html-preview-demo.html';
-    return drivePage(route, `${name} - Google ドライブ`, '<pre>&lt;!doctype html&gt;…</pre>');
+    const url = route.request().url();
+    const id = url.match(/\/d\/([-\w]+)/)[1];
+    const name = id === IDS.sjis ? 'sjis-sample.html' : id === IDS.denied ? 'locked.html' : 'drive-html-preview-demo.html';
+    const text = id === IDS.denied ? '<!doctype html><h1 id="fromdrive">Drive が表示した本文</h1>' : demoText;
+    return drivePage(route, `${name} - Google ドライブ`, viewerMarkup(name, text, false));
   });
   await context.route('https://drive.google.com/drive/**', (route) =>
     drivePage(
       route,
       'マイドライブ - Google ドライブ',
-      `<table>
+      `<table role="grid">
         <tr data-id="${IDS.demo}"><td><div><strong>list.html</strong></div></td></tr>
         <tr data-id="${IDS.sjis}"><td><div><strong>list.html</strong></div></td></tr>
         <tr data-id="1nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn"><td><div><strong>notes.txt</strong></div></td></tr>
@@ -299,50 +313,85 @@ test('invalid id in the viewer URL shows the empty state', async () => {
   await page.close();
 });
 
-test('Drive file page: button appears and opens the viewer next to it', async () => {
+async function embeddedPreview(page) {
+  const host = page.locator('#drive-html-preview-host');
+  await host.waitFor();
+  let viewerFrame;
+  for (let i = 0; i < 50 && !(viewerFrame = page.frames().find((f) => f.url().includes('/viewer.html?embed=1'))); i++) await page.waitForTimeout(100);
+  assert.ok(viewerFrame, 'viewer frame loaded despite the page CSP');
+  await viewerFrame.waitForSelector('#mini:not([hidden])');
+  let sandbox;
+  for (let i = 0; i < 50 && !(sandbox = page.frames().find((f) => f.url().endsWith('/sandbox.html') && f.parentFrame() === viewerFrame)); i++) await page.waitForTimeout(100);
+  assert.ok(sandbox, 'sandbox frame inside the viewer: ' + page.frames().map((f) => f.url().slice(0, 80) + ' <- ' + (f.parentFrame() ? f.parentFrame().url().slice(0, 50) : '-')).join(' | '));
+  return { host, viewerFrame, sandbox };
+}
+
+test('Drive file page: the HTML is rendered in place over the source text', async () => {
   const page = await context.newPage();
   await page.goto(`https://drive.google.com/file/d/${IDS.demo}/view`);
-  const button = page.locator('#drive-html-preview-host button');
-  await button.waitFor();
-  assert.match(await button.textContent(), msg('previewButton'));
-  if (shots) await page.screenshot({ path: join(shots, 'drive-button.png') });
+  const { host, viewerFrame, sandbox } = await embeddedPreview(page);
+  await sandbox.waitForSelector('h1');
+  assert.equal(await sandbox.textContent('h1'), '2026年 第3四半期 売上レポート');
+  assert.equal(await sandbox.evaluate(() => document.body.dataset.scriptRan), 'yes');
+
+  // Covers the scroll area under the header, leaving room for the side arrows.
+  const box = await host.boundingBox();
+  assert.deepEqual([box.x, box.y, box.width, box.height], [72, 128, 1280 - 144, 800 - 128]);
+  assert.equal(await viewerFrame.isVisible('.bar'), false, 'no full-page toolbar when embedded');
+
+  await viewerFrame.click('#miniSource');
+  assert.match(await viewerFrame.textContent('#source'), /^<!doctype html>/);
+  await viewerFrame.click('#miniRendered');
+  if (shots) {
+    await page.waitForTimeout(1200);
+    await page.screenshot({ path: join(shots, 'drive-embedded.png') });
+  }
+
   const opened = context.waitForEvent('page');
-  await button.click();
+  await viewerFrame.click('#openTab');
   const tab = await opened;
-  await tab.waitForURL(/viewer\.html/);
-  const q = new URL(tab.url()).searchParams;
-  assert.equal(q.get('id'), IDS.demo);
-  assert.equal(q.get('name'), 'drive-html-preview-demo.html');
+  await tab.waitForURL(/viewer\.html\?id=/);
   await tab.waitForSelector('#actions:not([hidden])');
   await tab.close();
+
+  // Follows window resizes.
+  await page.setViewportSize({ width: 1000, height: 700 });
+  let width = 0;
+  for (let i = 0; i < 30 && width !== 1000 - 144; i++) {
+    await page.waitForTimeout(100);
+    width = await page.evaluate(() => document.getElementById('drive-html-preview-host').getBoundingClientRect().width);
+  }
+  assert.equal(width, 1000 - 144);
+  await page.setViewportSize({ width: 1280, height: 800 });
   await page.close();
 });
 
-test('Drive folder overlay: picks the double-clicked file among same-name files', async () => {
+test('Drive file page: falls back to the text Drive shows when the download is refused', async () => {
+  const page = await context.newPage();
+  await page.goto(`https://drive.google.com/file/d/${IDS.denied}/view`);
+  const { viewerFrame, sandbox } = await embeddedPreview(page);
+  await sandbox.waitForSelector('#fromdrive');
+  assert.equal(await sandbox.textContent('#fromdrive'), 'Drive が表示した本文');
+  assert.match(await viewerFrame.textContent('#charset'), msg('fromDrive'));
+  await page.close();
+});
+
+test('Drive folder overlay: renders the double-clicked file among same-name files, and goes away on close', async () => {
   const page = await context.newPage();
   await page.goto('https://drive.google.com/drive/u/1/my-drive');
   await page.waitForTimeout(500);
-  assert.equal(await page.locator('#drive-html-preview-host').count(), 0, 'no button without a preview');
+  assert.equal(await page.locator('#drive-html-preview-host').count(), 0, 'nothing without a preview');
 
   await page.dblclick(`tr[data-id="${IDS.sjis}"] strong`);
-  await page.evaluate(() =>
-    document.body.insertAdjacentHTML(
-      'beforeend',
-      '<div><span role="button" aria-label="list.html の名前を変更する"><span><span>list.html</span></span></span><div role="dialog" aria-label="ビューアを表示しています。"><div role="main">…</div></div></div>'
-    )
-  );
-  const button = page.locator('#drive-html-preview-host button');
-  await button.waitFor();
-  const opened = context.waitForEvent('page');
-  await button.click();
-  const tab = await opened;
-  await tab.waitForURL(/viewer\.html/);
-  const q = new URL(tab.url()).searchParams;
+  await page.evaluate((html) => document.body.insertAdjacentHTML('beforeend', html), __viewerMarkup('list.html', '<p>sjis</p>', true));
+  const { viewerFrame, sandbox } = await embeddedPreview(page);
+  const q = new URL(viewerFrame.url()).searchParams;
   assert.equal(q.get('id'), IDS.sjis);
   assert.equal(q.get('authuser'), '1');
-  await tab.close();
+  await sandbox.waitForSelector('#h');
+  assert.equal(await sandbox.textContent('#h'), '日本語の見出し（Shift_JIS）');
 
-  await page.evaluate(() => document.querySelector('[role=dialog]').parentElement.remove());
+  await page.evaluate(() => document.querySelector('.overlay').remove());
   await page.locator('#drive-html-preview-host').waitFor({ state: 'detached' });
   await page.close();
 });
