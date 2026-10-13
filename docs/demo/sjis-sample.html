@@ -1,0 +1,10 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="Shift_JIS"><title>Shift_JIS テスト</title></head>
+<body style="font-family:sans-serif;padding:40px">
+<h1 id="h">日本語の見出し（Shift_JIS）</h1>
+<p>このファイルは Shift_JIS で保存されています。文字化けしなければ成功です。</p>
+<p><a id="ext" href="https://example.com/">外部リンク</a> / <a id="rel" href="other.html">相対リンク</a> / <a id="frag" href="#h">ページ内リンク</a></p>
+<div id="cdn">CDN 未読込</div>
+<script src="https://cdn.jsdelivr.net/npm/dayjs@1.11.13/dayjs.min.js"></script>
+<script>document.getElementById('cdn').textContent = (typeof dayjs === 'function') ? 'CDN スクリプト読込 OK ' + dayjs('2026-10-13').format('YYYY/MM/DD') : 'CDN NG';</script>
+</body></html>

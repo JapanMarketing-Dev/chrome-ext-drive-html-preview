@@ -1,0 +1,19 @@
+{
+  "name": "drive-html-preview",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Render HTML files stored in Google Drive as real web pages, right in Chrome.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "build": "node scripts/build.mjs",
+    "icons": "node scripts/render-assets.mjs icons",
+    "assets": "node scripts/render-assets.mjs all",
+    "test:integration": "node --test --test-concurrency=1 test/integration/*.int.mjs"
+  },
+  "devDependencies": {
+    "jsdom": "^25.0.1",
+    "playwright": "1.49"
+  }
+}

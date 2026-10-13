@@ -1,0 +1,65 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Drive HTML Preview</title>
+  <link rel="icon" href="icons/icon-32.png">
+  <link rel="stylesheet" href="viewer.css">
+</head>
+<body>
+  <header class="bar">
+    <div class="brand">
+      <img src="icons/icon-32.png" width="22" height="22" alt="">
+      <span class="file-name" id="fileName" data-i18n="appName"></span>
+      <span class="charset" id="charset" hidden></span>
+    </div>
+    <div class="actions" id="actions" hidden>
+      <div class="segmented" role="tablist">
+        <button type="button" role="tab" id="modeRendered" aria-selected="true" data-i18n="modeRendered"></button>
+        <button type="button" role="tab" id="modeSource" aria-selected="false" data-i18n="modeSource"></button>
+      </div>
+      <button type="button" class="icon-btn" id="reload" data-i18n-title="reload">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <a class="icon-btn" id="openDrive" target="_blank" rel="noopener" data-i18n-title="openInDrive">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </a>
+    </div>
+  </header>
+
+  <main id="stage">
+    <section class="panel" id="empty" hidden>
+      <img src="icons/icon-128.png" width="72" height="72" alt="">
+      <h1 data-i18n="emptyTitle"></h1>
+      <p data-i18n="emptyBody"></p>
+      <form id="urlForm" class="url-form">
+        <input id="urlInput" type="url" required autocomplete="off" spellcheck="false" data-i18n-placeholder="urlPlaceholder">
+        <button type="submit" data-i18n="urlSubmit"></button>
+      </form>
+      <p class="hint" id="urlError" role="alert" hidden data-i18n="urlInvalid"></p>
+    </section>
+
+    <section class="panel" id="loading" hidden>
+      <div class="spinner" aria-hidden="true"></div>
+      <p data-i18n="loading"></p>
+    </section>
+
+    <section class="panel" id="error" hidden>
+      <h1 data-i18n="errorTitle"></h1>
+      <p id="errorMessage"></p>
+      <div class="row">
+        <button type="button" id="retry" data-i18n="retry"></button>
+        <a id="errorOpenDrive" class="secondary" target="_blank" rel="noopener" data-i18n="openInDrive"></a>
+      </div>
+    </section>
+
+    <iframe id="frame" title="preview" hidden></iframe>
+    <pre id="source" hidden></pre>
+  </main>
+
+  <script src="lib/drive.js"></script>
+  <script src="lib/html.js"></script>
+  <script src="viewer.js"></script>
+</body>
+</html>
